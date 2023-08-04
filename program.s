@@ -1,4 +1,5 @@
 global entry
 entry:
-	mov rax, 4000000000000
+	mov rax, 4
+	sub rax, 1
 	ret
