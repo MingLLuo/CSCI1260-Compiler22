@@ -19,6 +19,8 @@ let rec compile_exp (exp : s_exp) : directive list =
       compile_exp arg @ [ Add (Reg Rax, Imm (1 lsl num_shift)) ]
   | Lst [ Sym "sub1"; arg ] ->
       compile_exp arg @ [ Sub (Reg Rax, Imm (1 lsl num_shift)) ]
+  | Lst [ Sym "not"; arg ] ->
+      compile_exp arg @ [ Cmp (Reg Rax, Imm ((0 lsl bool_shift) lor bool_tag)) ]
   | Sym "true" -> [ Mov (Reg Rax, Imm ((1 lsl bool_shift) lor bool_tag)) ]
   | Sym "false" -> [ Mov (Reg Rax, Imm ((0 lsl bool_shift) lor bool_tag)) ]
   | e -> raise (BadExpression e)

@@ -12,7 +12,7 @@ rule token = parse
     { LPAREN }
 | ')'
     { RPAREN }
-| '-'? ['0'-'9']+ as i
+| '-' ? ['0'-'9']+ as i
     { NUMBER (int_of_string i) }
 | ['a'-'z' 'A'-'Z' '+' '*'  '<' '=' '/' '>' '?']+['a'-'z' 'A'-'Z' '+' '-' '*'  '<' '=' '/' '>' '?' '0'-'9']* as s
     { SYMBOL s }
