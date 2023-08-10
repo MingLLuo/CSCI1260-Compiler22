@@ -36,6 +36,24 @@ let lf_to_bool : directive list =
     Or (Reg Rax, Imm bool_tag);
   ]
 
+(* modifies R8 *)
+let ensure_num (op : operand) : directive list =
+  [
+    Mov (Reg R8, op);
+    And (Reg R8, Imm num_mask);
+    Cmp (Reg R8, Imm num_tag);
+    Jnz "error";
+  ]
+
+(* modifies R8 *)
+let ensure_pair (op : operand) : directive list =
+  [
+    Mov (Reg R8, op);
+    And (Reg R8, Imm heap_mask);
+    Cmp (Reg R8, Imm pair_tag);
+    Jnz "error";
+  ]
+
 let stack_address stack_index = MemOffset (Reg Rsp, Imm stack_index)
 
 let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) :
@@ -59,9 +77,13 @@ let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) :
       @ [ And (Reg Rax, Imm num_mask); Cmp (Reg Rax, Imm num_tag) ]
       @ zf_to_bool
   | Lst [ Sym "add1"; arg ] ->
-      compile_exp tab stack_index arg @ [ Add (Reg Rax, operand_of_num 1) ]
+      compile_exp tab stack_index arg
+      @ ensure_num (Reg Rax)
+      @ [ Add (Reg Rax, operand_of_num 1) ]
   | Lst [ Sym "sub1"; arg ] ->
-      compile_exp tab stack_index arg @ [ Sub (Reg Rax, operand_of_num 1) ]
+      compile_exp tab stack_index arg
+      @ ensure_num (Reg Rax)
+      @ [ Sub (Reg Rax, operand_of_num 1) ]
   | Lst [ Sym "if"; test_exp; then_exp; else_exp ] ->
       let else_label = Util.gensym "else" in
       let continue_label = Util.gensym "continue" in
@@ -73,27 +95,35 @@ let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) :
       @ [ Label continue_label ]
   | Lst [ Sym "+"; e1; e2 ] ->
       compile_exp tab stack_index e1
+      @ ensure_num (Reg Rax)
       @ [ Mov (stack_address stack_index, Reg Rax) ]
       @ compile_exp tab (stack_index - 8) e2
+      @ ensure_num (Reg Rax)
       @ [ Mov (Reg R8, stack_address stack_index) ]
       @ [ Add (Reg Rax, Reg R8) ]
   | Lst [ Sym "-"; e1; e2 ] ->
       compile_exp tab stack_index e1
+      @ ensure_num (Reg Rax)
       @ [ Mov (stack_address stack_index, Reg Rax) ]
       @ compile_exp tab (stack_index - 8) e2
+      @ ensure_num (Reg Rax)
       @ [ Mov (Reg R8, stack_address stack_index) ]
       @ [ Sub (Reg Rax, Reg R8) ]
   | Lst [ Sym "<"; e1; e2 ] ->
       compile_exp tab stack_index e1
+      @ ensure_num (Reg Rax)
       @ [ Mov (stack_address stack_index, Reg Rax) ]
       @ compile_exp tab (stack_index - 8) e2
+      @ ensure_num (Reg Rax)
       @ [ Mov (Reg R8, stack_address stack_index) ]
       @ [ Cmp (Reg R8, Reg Rax) ]
       @ lf_to_bool
   | Lst [ Sym "="; e1; e2 ] ->
       compile_exp tab stack_index e1
+      @ ensure_num (Reg Rax)
       @ [ Mov (stack_address stack_index, Reg Rax) ]
       @ compile_exp tab (stack_index - 8) e2
+      @ ensure_num (Reg Rax)
       @ [ Mov (Reg R8, stack_address stack_index) ]
       @ [ Cmp (Reg R8, Reg Rax) ]
       @ zf_to_bool
@@ -122,7 +152,7 @@ let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) :
   | _ -> raise (BadExpression exp)
 
 let compile (program : s_exp) : string =
-  [ Global "entry"; Label "entry" ]
+  [ Global "entry"; Extern "error"; Label "entry" ]
   @ compile_exp Symtab.empty (-8) program
   @ [ Ret ]
   |> List.map string_of_directive
@@ -141,3 +171,12 @@ let compile_and_run (program : string) : string =
   let r = input_line inp in
   close_in inp;
   r
+
+let compile_and_run_err (program : string) : string =
+  try compile_and_run program with BadExpression _ -> "ERROR"
+
+let difftest (examples : string list) =
+  let results =
+    List.map (fun ex -> (compile_and_run_err ex, Interp.interp_err ex)) examples
+  in
+  List.for_all (fun (r1, r2) -> r1 = r2) results

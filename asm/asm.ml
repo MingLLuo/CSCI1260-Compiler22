@@ -25,6 +25,7 @@ let rec string_of_operand ?(last_byte = false) = function
 
 type directive =
   | Global of string
+  | Extern of string
   | Label of string
   | Mov of (operand * operand)
   | Add of (operand * operand)
@@ -38,6 +39,7 @@ type directive =
   | Setl of operand
   | Jmp of string
   | Jz of string
+  | Jnz of string
   | Ret
   | Comment of string
 
@@ -52,6 +54,7 @@ let label_name macos name = if macos then "_" ^ name else name
 let string_of_directive = function
   (* frontmatter *)
   | Global l -> Printf.sprintf "global %s" (label_name macos l)
+  | Extern l -> Printf.sprintf "extern %s" (label_name macos l)
   (* labels *)
   | Label l -> label_name macos l ^ ":"
   (* actual instructions *)
@@ -85,5 +88,6 @@ let string_of_directive = function
       Printf.sprintf "\tsetl %s" (string_of_operand ~last_byte:true dest)
   | Jmp name -> Printf.sprintf "\tjmp %s" (label_name macos name)
   | Jz name -> Printf.sprintf "\tjz %s" (label_name macos name)
+  | Jnz name -> Printf.sprintf "\tjnz %s" (label_name macos name)
   | Ret -> "\tret"
   | Comment s -> Printf.sprintf "; %s" s
