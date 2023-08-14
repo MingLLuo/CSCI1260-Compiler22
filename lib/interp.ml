@@ -12,13 +12,18 @@ let rec string_of_value (v : value) : string =
 
 exception BadExpression of s_exp
 
+let input_channel = ref stdin
+
 let rec interp_exp (env : value symtab) (exp : s_exp) : value =
   match exp with
   | Num n -> Number n
   | Sym var when Symtab.mem var env -> Symtab.find var env
   | Sym "true" -> Boolean true
   | Sym "false" -> Boolean false
-  | Lst [ Sym "pair"; e1; e2 ] -> Pair (interp_exp env e1, interp_exp env e2)
+  | Lst [ Sym "pair"; e1; e2 ] ->
+      let l = interp_exp env e1 in
+      let r = interp_exp env e2 in
+      Pair (l, r)
   | Lst [ Sym "left"; e ] -> (
       match interp_exp env e with
       | Pair (v, _) -> v
@@ -43,6 +48,7 @@ let rec interp_exp (env : value symtab) (exp : s_exp) : value =
       match interp_exp env arg with
       | Number _ -> Boolean true
       | _ -> Boolean false)
+  | Lst [ Sym "read-num" ] -> Number (input_line !input_channel |> int_of_string)
   | Lst [ Sym "if"; test_exp; then_exp; else_exp ] ->
       if interp_exp env test_exp = Boolean false then interp_exp env else_exp
       else interp_exp env then_exp
