@@ -18,8 +18,14 @@ let output_channel = ref stdout
 let rec interp_exp (defns : defn list) (env : value symtab) (exp : s_exp) :
     value =
   match exp with
-  (* | Lst (Sym f :: args) when is_defn defns ->
-      raise (BadExpression exp) not implemented yet *)
+  | Lst (Sym f :: args) when is_defn defns f ->
+      let defn = get_defn defns f in
+      if List.length args <> List.length defn.args then
+        raise (BadExpression exp)
+      else
+        let vals = List.map (interp_exp defns env) args in
+        let fenv = Symtab.of_list (List.combine defn.args vals) in
+        interp_exp defns fenv defn.body
   | Sym var when Symtab.mem var env -> Symtab.find var env
   | Num n -> Number n
   | Sym "true" -> Boolean true
@@ -98,7 +104,7 @@ let rec interp_exp (defns : defn list) (env : value symtab) (exp : s_exp) :
   | _ -> raise (BadExpression exp)
 
 let interp (program : string) : unit =
-  let defns, body = parse_many program |> get_defns_and_body in
+  let defns, body = parse_many program |> defns_and_body in
   interp_exp defns Symtab.empty body |> ignore
 
 let interp_io (program : string) (input : string) =
