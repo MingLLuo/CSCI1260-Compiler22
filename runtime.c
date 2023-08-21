@@ -51,6 +51,11 @@ void print_value(uint64_t value) {
 
 
 int main(int argc, char **argv) {
-  print_value(entry((void*)malloc(4096)));
+  void *heap = (void *)malloc(4096);
+  entry(heap);
   return 0;
+}
+
+void print_newline() {
+  printf("\n");
 }
