@@ -41,7 +41,8 @@ type expr =
   | Do of expr list
   | Num of int
   | Var of string
-  | Call of string * expr list
+  | Closure of string
+  | Call of expr * expr list
   | True
   | False
 
@@ -71,7 +72,8 @@ let rec expr_of_s_exp : s_exp -> expr = function
         ( Option.get (prim2_of_string prim),
           expr_of_s_exp arg1,
           expr_of_s_exp arg2 )
-  | Lst (Sym f :: args) -> Call (f, List.map expr_of_s_exp args)
+  | Lst (Sym f :: args) -> Call (Var f, List.map expr_of_s_exp args)
+  | Lst (e :: args) -> Call (expr_of_s_exp e, List.map expr_of_s_exp args)
   | e -> raise (BadSExpression e)
 
 let program_of_s_exps (exps : s_exp list) : program =
@@ -96,3 +98,18 @@ let program_of_s_exps (exps : s_exp list) : program =
   go exps []
 
 exception BadExpression of expr
+
+let rec fv (defns : defn list) (bound : string list) = function
+  | Var s when not (List.mem s bound) -> [ s ]
+  | Let (v, e, body) -> fv defns bound e @ fv defns (v :: bound) body
+  | If (te, the, ee) ->
+      fv defns bound te @ fv defns bound the @ fv defns bound ee
+  | Do es -> List.concat_map (fv defns bound) es
+  | Call (exp, args) ->
+      fv defns bound exp @ List.concat_map (fv defns bound) args
+  | Prim1 (_, e) -> fv defns bound e
+  | Prim2 (_, e1, e2) -> fv defns bound e1 @ fv defns bound e2
+  | Closure f ->
+      let defn = get_defn defns f in
+      fv defns (bound @ List.map (fun d -> d.name) defns @ defn.args) defn.body
+  | _ -> []
